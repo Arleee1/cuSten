@@ -16,8 +16,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+# Modified by Arleee1 (Ethan Ermovick) to use cuda arch from make argument
+
 NVCC := nvcc
-NVFLAGS := --device-c --gpu-architecture=sm_61 -O3 -std=c++11
+
+ARCH ?= sm_80
+NVFLAGS := --device-c --gpu-architecture=$(ARCH) -O3 -std=c++11
 
 OBJBIN := obj
 OBJDIR := $(shell mkdir -p $(OBJBIN))

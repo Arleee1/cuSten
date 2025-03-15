@@ -15,6 +15,8 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
+// Modified by Arleee1 (Ethan Ermovick) to fix sizeof usage in malloc calls
+
 /*! \file custenCreateDestroy2DXYnp.cu
     Functions to create and destroy the cuSten_t that is used to give input to the compute kernels. 
     2D xy direction, non-periodic
@@ -107,7 +109,7 @@ void cuStenCreate2DXYnp(
 	checkError(msgStringBuffer);	
 
 	// Create memeory for the streams
-	pt_cuSten->streams = (cudaStream_t*)malloc(pt_cuSten->numStreams * sizeof(cudaStream_t*));
+	pt_cuSten->streams = (cudaStream_t*)malloc(pt_cuSten->numStreams * sizeof(cudaStream_t));
 
 	// Create the streams
 	for (int st = 0; st < pt_cuSten->numStreams; st++)
@@ -118,7 +120,7 @@ void cuStenCreate2DXYnp(
 	}
 
 	// Create memeory for the events
-	pt_cuSten->events = (cudaEvent_t*)malloc(2 * sizeof(cudaEvent_t*));
+	pt_cuSten->events = (cudaEvent_t*)malloc(2 * sizeof(cudaEvent_t));
 
 	// Create the events
 	for (int ev = 0; ev < 2; ev++)
@@ -163,10 +165,10 @@ void cuStenCreate2DXYnp(
 	pt_cuSten->weights = weights;
 
 	// Allocate the pointers for each input tile
-	pt_cuSten->dataInput = (elemType**)malloc(pt_cuSten->numTiles * sizeof(elemType));
+	pt_cuSten->dataInput = (elemType**)malloc(pt_cuSten->numTiles * sizeof(elemType*));
 
 	// Allocate the pointers for each output tile
-	pt_cuSten->dataOutput = (elemType**)malloc(pt_cuSten->numTiles * sizeof(elemType));
+	pt_cuSten->dataOutput = (elemType**)malloc(pt_cuSten->numTiles * sizeof(elemType*));
 
 	// // Tile offset index
 	int offset = pt_cuSten->nx * pt_cuSten->nyTile;
@@ -187,10 +189,10 @@ void cuStenCreate2DXYnp(
 	// 3 or greater
 
 	// Allocate top boundary memory
-	pt_cuSten->boundaryTop = (elemType**)malloc(pt_cuSten->numTiles * sizeof(elemType));
+	pt_cuSten->boundaryTop = (elemType**)malloc(pt_cuSten->numTiles * sizeof(elemType*));
 
 	// Allocate bottom boundary memory
-	pt_cuSten->boundaryBottom = (elemType**)malloc(pt_cuSten->numTiles * sizeof(elemType));
+	pt_cuSten->boundaryBottom = (elemType**)malloc(pt_cuSten->numTiles * sizeof(elemType*));
 
 	switch(pt_cuSten->numTiles)
 	{

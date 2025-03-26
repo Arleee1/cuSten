@@ -19,6 +19,8 @@
     Kernel to apply a xy direction stencil on a 2D grid - non periodic
 */
 
+// Modified by Arleee1 to work for full input range
+
 // ---------------------------------------------------------------------
 //  Standard Libraries and Headers
 // ---------------------------------------------------------------------
@@ -60,7 +62,8 @@
 	\param tileTop Check if the current tile is at the top of the domain
 	\param tileBottom Check if the current tile is at the bottom of the domain
 */
-
+#define debug(fmt, ...) if(globalIdx == 2 && globalIdy == 95) { printf("GPU At Line: %d, for 2,95: " fmt "\n", __LINE__, ##__VA_ARGS__);}
+#define whichThread() printf("GPU Got to line %d with thread %d, %d\n", __LINE__, globalIdx, globalIdy);
 template <typename elemType>
 __global__ void kernel2DXYnp
 (
@@ -89,7 +92,6 @@ __global__ void kernel2DXYnp
 	// -----------------------------	
 	// Allocate the shared memory
 	// -----------------------------
-
 	extern __shared__ int memory[];
 
 	elemType* arrayLocal = (elemType*)&memory;
@@ -109,7 +111,8 @@ __global__ void kernel2DXYnp
 	// True matrix index
 	int globalIdx = blockDim.x * blockIdx.x + threadIdx.x;
 	int globalIdy = blockDim.y * blockIdx.y + threadIdx.y;
-
+	// printf("(%d,%d)", globalIdx, globalIdy);
+	debug("start")
 	// Local matrix index
 	int localIdx = threadIdx.x + numStenLeft;
 	int localIdy = threadIdx.y + numStenTop;
@@ -136,6 +139,7 @@ __global__ void kernel2DXYnp
 
 	if (blockIdx.x == 0 && blockIdx.y == 0)
 	{
+		debug("if")
 		// ----------
 		// Copy
 		// ----------
@@ -229,6 +233,7 @@ __global__ void kernel2DXYnp
 
 	else if (blockIdx.x == nx / BLOCK_X - 1 && blockIdx.y == 0)
 	{
+		debug("if")
 		// ----------
 		// Copy
 		// ----------
@@ -242,6 +247,12 @@ __global__ void kernel2DXYnp
 			arrayLocal[localIdy * nxLocal + threadIdx.x] = dataInput[globalIdy * nx + (globalIdx - numStenLeft)];
 		}
 
+		// Right
+		if (threadIdx.x < numStenRight)
+		{
+			arrayLocal[localIdy * nxLocal + (localIdx + BLOCK_X)] = dataInput[globalIdy * nx + globalIdx + BLOCK_X];
+		}
+
 		// Bottom
 		if (threadIdx.y < numStenBottom)
 		{
@@ -252,6 +263,12 @@ __global__ void kernel2DXYnp
 		if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
 		{
 			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx - numStenLeft)];
+		}
+
+		// Bottom Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx + BLOCK_X)];
 		}
 
 		// Top
@@ -286,11 +303,13 @@ __global__ void kernel2DXYnp
 
 			for (int i = 0; i < numStenHoriz; i++) // Allow for the point we're actually at
 			{
+				debug("adding local: %0.3f, stenSet=%d, temp=%d, i=%d", arrayLocal[stenSet + temp + i], stenSet, temp, i);
 				sum += weigthsLocal[weight] * arrayLocal[stenSet + temp + i];
 
 				weight++;
 			} 
 		}
+		debug("sum: %0.3f", sum)
 
 		// Ensure the compute is complete
 		__syncthreads();
@@ -301,15 +320,19 @@ __global__ void kernel2DXYnp
 
 		if (tileTop == 1)
 		{
-			if (threadIdx.x < BLOCK_X - numStenRight && threadIdx.y >= numStenTop)
+			debug("Tile top. tid.x: %d, block x: %d, numRight: %d, tid.y: %d, numAbove: %d", threadIdx.x, BLOCK_X, numStenRight, threadIdx.y, numStenTop)
+			if (threadIdx.x <= BLOCK_X - numStenRight && threadIdx.y >= numStenTop)
 			{
+				debug("writing sum of %.3f", sum)
 				dataOutput[globalIdy * nx + globalIdx] = sum;
 			}
 		}
 		else
 		{
+			debug("Not tile top")
 			if (threadIdx.x < BLOCK_X - numStenRight)
 			{
+				debug("writing sum of %.3f", sum)
 				dataOutput[globalIdy * nx + globalIdx] = sum;
 			}
 		}
@@ -322,6 +345,7 @@ __global__ void kernel2DXYnp
 
 	else if (blockIdx.x == 0 && blockIdx.y == nyTile / BLOCK_Y - 1)
 	{
+		debug("if")
 		// ----------
 		// Copy
 		// ----------
@@ -347,20 +371,37 @@ __global__ void kernel2DXYnp
 			arrayLocal[threadIdx.y * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy - numStenTop) * nx + (globalIdx + BLOCK_X)];
 		}
 
-		if (tileBottom != 1)
+		// Bottom Left
+		if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
 		{
-			// Bottom
-			if (threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = boundaryBottom[threadIdx.y * nx + globalIdx];
-			}
-
-			// Bottom Right
-			if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] =  boundaryBottom[threadIdx.y * nx + (globalIdx + BLOCK_X)];
-			}
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx - numStenLeft)];
 		}
+		// Bottom
+		if (threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = dataInput[(globalIdy + BLOCK_Y) * nx + globalIdx];
+		}
+
+		// Bottom Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx + BLOCK_X)];
+		}
+
+		// if (tileBottom != 1)
+		// {
+			// Bottom
+			// if (threadIdx.y < numStenBottom)
+			// {
+			// 	arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = boundaryBottom[threadIdx.y * nx + globalIdx];
+			// }
+
+			// // Bottom Right
+			// if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
+			// {
+			// 	arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] =  boundaryBottom[threadIdx.y * nx + (globalIdx + BLOCK_X)];
+			// }
+		// }
 
 		// Ensure the copy is complete
 		__syncthreads();
@@ -378,6 +419,7 @@ __global__ void kernel2DXYnp
 
 			for (int i = 0; i < numStenHoriz; i++) // Allow for the point we're actually at
 			{
+				debug("adding local: %0.3f, stenSet=%d, temp=%d, i=%d", arrayLocal[stenSet + temp + i], stenSet, temp, i);
 				sum += weigthsLocal[weight] * arrayLocal[stenSet + temp + i];
 
 				weight++;
@@ -393,7 +435,8 @@ __global__ void kernel2DXYnp
 
 		if (tileBottom == 1)
 		{
-			if (threadIdx.x >= numStenLeft && threadIdx.y < BLOCK_Y - numStenBottom)
+			debug("tid.x: %d, numLeft: %d, tid.y: %d, block_y: %d, numBot: %d", threadIdx.x, numStenLeft, threadIdx.y, BLOCK_Y, numStenBottom)
+			if (threadIdx.x >= numStenLeft && threadIdx.y <= BLOCK_Y - numStenBottom)
 			{
 				dataOutput[globalIdy * nx + globalIdx] = sum;
 			}
@@ -413,6 +456,7 @@ __global__ void kernel2DXYnp
 
 	else if (blockIdx.x == nx / BLOCK_X - 1 && blockIdx.y == nyTile / BLOCK_Y - 1)
 	{
+		debug("if")
 		// ----------
 		// Copy
 		// ----------
@@ -425,6 +469,11 @@ __global__ void kernel2DXYnp
 		{
 			arrayLocal[localIdy * nxLocal + threadIdx.x] = dataInput[globalIdy * nx + (globalIdx - numStenLeft)];
 		}
+		// Right
+		if (threadIdx.x < numStenRight)
+		{
+			arrayLocal[localIdy * nxLocal + (localIdx + BLOCK_X)] = dataInput[globalIdy * nx + globalIdx + BLOCK_X];
+		}
 
 		// Top
 		if (threadIdx.y < numStenTop)
@@ -436,6 +485,19 @@ __global__ void kernel2DXYnp
 		if (threadIdx.x < numStenLeft && threadIdx.y < numStenTop)
 		{
 			arrayLocal[threadIdx.y * nxLocal + threadIdx.x] = dataInput[(globalIdy - numStenTop) * nx + (globalIdx - numStenLeft)];
+		}
+		// Top Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenTop)
+		{
+			arrayLocal[threadIdx.y * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy - numStenTop) * nx + (globalIdx + BLOCK_X)];
+		}
+		debug("tid.x: %d, numRight: %d, tid.y: %d, numBot: %d", threadIdx.x, numStenRight, threadIdx.y, numStenBottom);
+		// Bottom Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
+		{
+			debug("Bottom right")
+			whichThread();
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx + BLOCK_X)];
 		}
 
 		if (tileBottom != 1)
@@ -469,6 +531,8 @@ __global__ void kernel2DXYnp
 
 			for (int i = 0; i < numStenHoriz; i++) // Allow for the point we're actually at
 			{
+				// to debug
+				debug("adding local: %0.3f, stenSet=%d, temp=%d, i=%d", arrayLocal[stenSet + temp + i], stenSet, temp, i);
 				sum += weigthsLocal[weight] * arrayLocal[stenSet + temp + i];
 
 				weight++;
@@ -484,7 +548,7 @@ __global__ void kernel2DXYnp
 
 		if (tileBottom == 1)
 		{
-			if (threadIdx.x < BLOCK_X - numStenRight && threadIdx.y < BLOCK_Y - numStenBottom)
+			if (threadIdx.x <= BLOCK_X - numStenRight && threadIdx.y <= BLOCK_Y - numStenBottom)
 			{
 				dataOutput[globalIdy * nx + globalIdx] = sum;
 			}
@@ -504,6 +568,7 @@ __global__ void kernel2DXYnp
 
 	else if (blockIdx.y == 0)
 	{
+		debug("if")
 		// ----------
 		// Copy
 		// ----------
@@ -610,6 +675,7 @@ __global__ void kernel2DXYnp
 
 	else if (blockIdx.y == nyTile / BLOCK_Y - 1)
 	{
+		debug("if")
 		// ----------
 		// Copy
 		// ----------
@@ -716,6 +782,7 @@ __global__ void kernel2DXYnp
 
 	else if (blockIdx.x == 0)
 	{
+		debug("if")
 		// ----------
 		// Copy
 		// ----------
@@ -794,6 +861,7 @@ __global__ void kernel2DXYnp
 
 	else if (blockIdx.x == nx / BLOCK_X - 1)
 	{
+		debug("if")
 		// ----------
 		// Copy
 		// ----------
@@ -805,6 +873,12 @@ __global__ void kernel2DXYnp
 		if (threadIdx.x < numStenLeft)
 		{
 			arrayLocal[localIdy * nxLocal + threadIdx.x] = dataInput[globalIdy * nx + (globalIdx - numStenLeft)];
+		}
+
+		// Right
+		if (threadIdx.x < numStenRight)
+		{
+			arrayLocal[localIdy * nxLocal + (localIdx + BLOCK_X)] = dataInput[globalIdy * nx + globalIdx + BLOCK_X];
 		}
 
 		// Top
@@ -831,6 +905,20 @@ __global__ void kernel2DXYnp
 			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx - numStenLeft)];
 		}
 
+		// Bottom Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx + BLOCK_X)];
+		}
+
+		// Top Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenTop)
+		{
+			// debug("Top right: %0.3f", )
+			// arrayLocal[threadIdx.y * nxLocal + (localIdx + BLOCK_X)] = boundaryTop[threadIdx.y * nx + (globalIdx + BLOCK_X)];
+			arrayLocal[threadIdx.y * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy - numStenTop) * nx + (globalIdx + BLOCK_X)];
+		}
+
 		// Ensure copying completed
 		__syncthreads();
 		
@@ -847,6 +935,7 @@ __global__ void kernel2DXYnp
 
 			for (int i = 0; i < numStenHoriz; i++) // Allow for the point we're actually at
 			{
+				debug("adding local: %0.3f, stenSet=%d, temp=%d, i=%d", arrayLocal[stenSet + temp + i], stenSet, temp, i);
 				sum += weigthsLocal[weight] * arrayLocal[stenSet + temp + i];
 
 				weight++;
@@ -860,7 +949,7 @@ __global__ void kernel2DXYnp
 		// Copy back 
 		// ----------
 
-		if (threadIdx.x < BLOCK_X - numStenLeft)
+		if (threadIdx.x <= BLOCK_X - numStenLeft)
 		{
 			dataOutput[globalIdy * nx + globalIdx] = sum;
 		}
@@ -872,6 +961,7 @@ __global__ void kernel2DXYnp
 
 	else
 	{
+		debug("if")
 		// ----------
 		// Copy
 		// ----------
@@ -1042,7 +1132,7 @@ void cuStenCompute2DXYnp
 		}
 		// Synchronise the events to ensure computation overlaps
 		cudaEventSynchronize(pt_cuSten->events[0]);
-
+		printf("block x: %d", pt_cuSten->BLOCK_X);
 		// Preform the computation on the current tile
 		kernel2DXYnp<<<gridDim, blockDim, pt_cuSten->mem_shared, pt_cuSten->streams[0]>>>(
 			pt_cuSten->dataOutput[tile], 

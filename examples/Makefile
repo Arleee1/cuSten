@@ -17,8 +17,8 @@
 #   limitations under the License.
 
 NVCC := nvcc
-NVFLAGS := --device-c -arch=sm_61 -O3 -std=c++11
-NVFLAGFIN := -arch=sm_61 -O3 -std=c++11 ../cuSten/lib/libcuSten.a
+NVFLAGS := --device-c -arch=sm_75 -O3 -std=c++11
+NVFLAGFIN := -arch=sm_75 -O3 -std=c++11 ../cuSten/lib/libcuSten.a
 
 OBJBIN := obj
 OBJDIR := $(shell mkdir -p $(OBJBIN))

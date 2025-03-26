@@ -62,8 +62,10 @@
 	\param tileTop Check if the current tile is at the top of the domain
 	\param tileBottom Check if the current tile is at the bottom of the domain
 */
-#define debug(fmt, ...) if(globalIdx == 90 && globalIdy == 95) { printf("GPU At Line: %d, for 90,95: " fmt "\n", __LINE__, ##__VA_ARGS__);}
+#define debug(fmt, ...) if(globalIdx == 14 && globalIdy == 94) { printf("GPU At Line: %d, for 14,94: " fmt "\n", __LINE__, ##__VA_ARGS__);}
 #define whichThread() //printf("GPU Got to line %d with thread %d, %d\n", __LINE__, globalIdx, globalIdy);
+// TODO: Maybe replace checks for inserting element (globalIdx < nx) with (globalIdx < nx - numRight), or similar
+// Depends on if elements outside of the stencil range should be 0 or are simply undefined (I think undefined makes more sense)
 template <typename elemType>
 __global__ void kernel2DXYnp
 (
@@ -321,7 +323,8 @@ __global__ void kernel2DXYnp
 		if (tileTop == 1)
 		{
 			debug("Tile top. tid.x: %d, block x: %d, numRight: %d, tid.y: %d, numAbove: %d", threadIdx.x, BLOCK_X, numStenRight, threadIdx.y, numStenTop)
-			if (threadIdx.x <= BLOCK_X - numStenRight && threadIdx.y >= numStenTop)
+			// if (threadIdx.x <= BLOCK_X - numStenRight && threadIdx.y >= numStenTop)
+			if(globalIdx < nx && globalIdy < nyTile)
 			{
 				debug("writing sum of %.3f", sum)
 				dataOutput[globalIdy * nx + globalIdx] = sum;
@@ -436,7 +439,7 @@ __global__ void kernel2DXYnp
 		if (tileBottom == 1)
 		{
 			debug("tid.x: %d, numLeft: %d, tid.y: %d, block_y: %d, numBot: %d", threadIdx.x, numStenLeft, threadIdx.y, BLOCK_Y, numStenBottom)
-			if (threadIdx.x >= numStenLeft && threadIdx.y <= BLOCK_Y - numStenBottom)
+			if (globalIdx < nx && globalIdy < nyTile)
 			{
 				dataOutput[globalIdy * nx + globalIdx] = sum;
 			}
@@ -558,7 +561,7 @@ __global__ void kernel2DXYnp
 
 		if (tileBottom == 1)
 		{
-			if (threadIdx.x <= BLOCK_X - numStenRight && threadIdx.y <= BLOCK_Y - numStenBottom)
+			if (globalIdx < nx && globalIdy < nyTile)
 			{
 				dataOutput[globalIdy * nx + globalIdx] = sum;
 			}
@@ -793,7 +796,7 @@ __global__ void kernel2DXYnp
 
 		if (tileBottom == 1)
 		{
-			if (threadIdx.y <= BLOCK_Y - numStenBottom)
+			if (globalIdy < nyTile)
 			{
 				dataOutput[globalIdy * nx + globalIdx] = sum;
 			}
@@ -977,7 +980,7 @@ __global__ void kernel2DXYnp
 		// Copy back 
 		// ----------
 
-		if (threadIdx.x <= BLOCK_X - numStenLeft)
+		if (globalIdx < nx)
 		{
 			dataOutput[globalIdy * nx + globalIdx] = sum;
 		}

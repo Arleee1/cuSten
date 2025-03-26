@@ -62,8 +62,8 @@
 	\param tileTop Check if the current tile is at the top of the domain
 	\param tileBottom Check if the current tile is at the bottom of the domain
 */
-#define debug(fmt, ...) if(globalIdx == 2 && globalIdy == 95) { printf("GPU At Line: %d, for 2,95: " fmt "\n", __LINE__, ##__VA_ARGS__);}
-#define whichThread() printf("GPU Got to line %d with thread %d, %d\n", __LINE__, globalIdx, globalIdy);
+#define debug(fmt, ...) if(globalIdx == 90 && globalIdy == 95) { printf("GPU At Line: %d, for 90,95: " fmt "\n", __LINE__, ##__VA_ARGS__);}
+#define whichThread() //printf("GPU Got to line %d with thread %d, %d\n", __LINE__, globalIdx, globalIdy);
 template <typename elemType>
 __global__ void kernel2DXYnp
 (
@@ -500,19 +500,29 @@ __global__ void kernel2DXYnp
 			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx + BLOCK_X)];
 		}
 
-		if (tileBottom != 1)
-		{
-			// Bottom
-			if (threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = boundaryBottom[threadIdx.y * nx + globalIdx];
-			}
+		// if (tileBottom != 1)
+		// {
+		// 	// Bottom
+		// 	if (threadIdx.y < numStenBottom)
+		// 	{
+		// 		arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = boundaryBottom[threadIdx.y * nx + globalIdx];
+		// 	}
 
-			// Bottom Left
-			if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = boundaryBottom[threadIdx.y * nx + (globalIdx - numStenLeft)];
-			}
+		// 	// Bottom Left
+		// 	if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
+		// 	{
+		// 		arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = boundaryBottom[threadIdx.y * nx + (globalIdx - numStenLeft)];
+		// 	}
+		// }
+		// Bottom Left
+		if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx - numStenLeft)];
+		}
+		// Bottom
+		if (threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = dataInput[(globalIdy + BLOCK_Y) * nx + globalIdx];
 		}
 
 		// Ensure copying completed
@@ -713,26 +723,44 @@ __global__ void kernel2DXYnp
 			arrayLocal[threadIdx.y * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy - numStenTop) * nx + (globalIdx + BLOCK_X)];
 		}
 
-		if (tileBottom != 1)
+		// Bottom
+		if (threadIdx.y < numStenBottom)
 		{
-			// Bottom
-			if (threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = boundaryBottom[threadIdx.y * nx + globalIdx];
-			}
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = dataInput[(globalIdy + BLOCK_Y) * nx + globalIdx];
+		}
 
-			// Bottom Left
-			if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = boundaryBottom[threadIdx.y * nx + (globalIdx - numStenLeft)];
-			}
+		// Bottom Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx + BLOCK_X)];
+		}
 
-			// Bottom Right
-			if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] =  boundaryBottom[threadIdx.y * nx + (globalIdx + BLOCK_X)];
-			}
-		}	
+		// Bottom Left
+		if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx - numStenLeft)];
+		}
+
+		// if (tileBottom != 1)
+		// {
+		// 	// Bottom
+		// 	if (threadIdx.y < numStenBottom)
+		// 	{
+		// 		arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = boundaryBottom[threadIdx.y * nx + globalIdx];
+		// 	}
+
+		// 	// Bottom Left
+		// 	if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
+		// 	{
+		// 		arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = boundaryBottom[threadIdx.y * nx + (globalIdx - numStenLeft)];
+		// 	}
+
+		// 	// Bottom Right
+		// 	if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
+		// 	{
+		// 		arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] =  boundaryBottom[threadIdx.y * nx + (globalIdx + BLOCK_X)];
+		// 	}
+		// }	
 
 		// Ensure copying completed
 		__syncthreads();
@@ -765,7 +793,7 @@ __global__ void kernel2DXYnp
 
 		if (tileBottom == 1)
 		{
-			if (threadIdx.y < BLOCK_Y - numStenBottom)
+			if (threadIdx.y <= BLOCK_Y - numStenBottom)
 			{
 				dataOutput[globalIdy * nx + globalIdx] = sum;
 			}

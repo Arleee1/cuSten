@@ -62,7 +62,7 @@
 	\param tileTop Check if the current tile is at the top of the domain
 	\param tileBottom Check if the current tile is at the bottom of the domain
 */
-#define debug(fmt, ...) if(globalIdx == 14 && globalIdy == 94) { printf("GPU At Line: %d, for 14,94: " fmt "\n", __LINE__, ##__VA_ARGS__);}
+#define debug(fmt, ...) //if(globalIdx == 14 && globalIdy == 94) { printf("GPU At Line: %d, for 14,94: " fmt "\n", __LINE__, ##__VA_ARGS__);}
 #define whichThread() //printf("GPU Got to line %d with thread %d, %d\n", __LINE__, globalIdx, globalIdy);
 // TODO: Maybe replace checks for inserting element (globalIdx < nx) with (globalIdx < nx - numRight), or similar
 // Depends on if elements outside of the stencil range should be 0 or are simply undefined (I think undefined makes more sense)
@@ -90,7 +90,7 @@ __global__ void kernel2DXYnp
 	const int tileTop,					
 	const int tileBottom				
 )
-{	
+{
 	// -----------------------------	
 	// Allocate the shared memory
 	// -----------------------------
@@ -1111,20 +1111,40 @@ void cuStenCompute2DXYnp
 
 	// Load the weights
 	cudaMemPrefetchAsync(pt_cuSten->weights, pt_cuSten->numSten * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
+	sprintf(msgStringBuffer, "Prefetching weights");
+	checkError(msgStringBuffer);
 
 	// Ensure the current stream is free
 	cudaStreamSynchronize(pt_cuSten->streams[1]);
+	sprintf(msgStringBuffer, "Synchronizing stream 1");
+	checkError(msgStringBuffer);
 
 	// Prefetch the tile data
 	cudaMemPrefetchAsync(pt_cuSten->dataInput[0], pt_cuSten->nx * pt_cuSten->nyTile * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
+	sprintf(msgStringBuffer, "Prefetching input");
+	checkError(msgStringBuffer);
+
 	cudaMemPrefetchAsync(pt_cuSten->dataOutput[0], pt_cuSten->nx * pt_cuSten->nyTile * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
+	sprintf(msgStringBuffer, "Prefetching output");
+	checkError(msgStringBuffer);
 
 	// Prefetch the boundary data
-	cudaMemPrefetchAsync(pt_cuSten->boundaryTop[0], pt_cuSten->numBoundaryTop * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
-	cudaMemPrefetchAsync(pt_cuSten->boundaryBottom[0], pt_cuSten->numBoundaryTop * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
+	if(pt_cuSten->numBoundaryBottom > 0) {
+		cudaMemPrefetchAsync(pt_cuSten->boundaryBottom[0], pt_cuSten->numBoundaryBottom * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
+		sprintf(msgStringBuffer, "Prefetching boundary bottom");
+		checkError(msgStringBuffer);
+	}
+	if(pt_cuSten->numBoundaryTop > 0) {
+		cudaMemPrefetchAsync(pt_cuSten->boundaryTop[0], pt_cuSten->numBoundaryTop * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
+		sprintf(msgStringBuffer, "Prefetching boundary top");
+		checkError(msgStringBuffer);
+	}
+	
 
 	// Record the event
 	cudaEventRecord(pt_cuSten->events[0], pt_cuSten->streams[1]);
+	sprintf(msgStringBuffer, "Recording events and streams");
+	checkError(msgStringBuffer);
 
 	// Temporary stream and event used for permuting
 	cudaStream_t ts;
@@ -1161,9 +1181,12 @@ void cuStenCompute2DXYnp
 				tileBottom = 0;
 			}
 		}
+		sprintf(msgStringBuffer, "Error before kernel: ");
+		checkError(msgStringBuffer);
 		// Synchronise the events to ensure computation overlaps
 		cudaEventSynchronize(pt_cuSten->events[0]);
-		printf("block x: %d", pt_cuSten->BLOCK_X);
+		sprintf(msgStringBuffer, "Synchronizing events");
+		checkError(msgStringBuffer);
 		// Preform the computation on the current tile
 		kernel2DXYnp<<<gridDim, blockDim, pt_cuSten->mem_shared, pt_cuSten->streams[0]>>>(
 			pt_cuSten->dataOutput[tile], 

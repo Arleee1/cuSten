@@ -20,6 +20,8 @@
  * Main header for cuSten library
  */
 
+// Modified by Arleee1 to add prototype for kernel2DXYnp
+
 // ---------------------------------------------------------------------
 // Define Header
 // ---------------------------------------------------------------------
@@ -39,6 +41,31 @@
 #include "src/struct/cuSten_struct_functions.h"
 #include "src/kernels/stencil_kernels.h"
 #include "src/util/util.h"
+
+template <typename elemType>
+__global__ void kernel2DXYnp
+(
+	elemType* dataOutput,
+	elemType* dataInput,
+	elemType* boundaryTop,
+	elemType* boundaryBottom,
+	const elemType* weights,
+	const int numSten,
+	const int numStenHoriz,
+	const int numStenLeft,
+	const int numStenRight,
+	const int numStenVert,
+	const int numStenTop,
+	const int numStenBottom,
+	const int nxLocal,
+	const int nyLocal,
+	const int BLOCK_X,
+	const int BLOCK_Y,
+	const int nx,
+	const int nyTile,
+	const int tileTop,
+	const int tileBottom
+);
 
 #endif
 

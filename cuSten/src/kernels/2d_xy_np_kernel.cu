@@ -19,6 +19,8 @@
     Kernel to apply a xy direction stencil on a 2D grid - non periodic
 */
 
+// Modified by Arleee1 to work for full input range and to better handle cuda errors
+
 // ---------------------------------------------------------------------
 //  Standard Libraries and Headers
 // ---------------------------------------------------------------------
@@ -85,7 +87,7 @@ __global__ void kernel2DXYnp
 	const int tileTop,					
 	const int tileBottom				
 )
-{	
+{
 	// -----------------------------	
 	// Allocate the shared memory
 	// -----------------------------
@@ -242,6 +244,12 @@ __global__ void kernel2DXYnp
 			arrayLocal[localIdy * nxLocal + threadIdx.x] = dataInput[globalIdy * nx + (globalIdx - numStenLeft)];
 		}
 
+		// Right
+		if (threadIdx.x < numStenRight)
+		{
+			arrayLocal[localIdy * nxLocal + (localIdx + BLOCK_X)] = dataInput[globalIdy * nx + globalIdx + BLOCK_X];
+		}
+
 		// Bottom
 		if (threadIdx.y < numStenBottom)
 		{
@@ -252,6 +260,12 @@ __global__ void kernel2DXYnp
 		if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
 		{
 			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx - numStenLeft)];
+		}
+
+		// Bottom Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx + BLOCK_X)];
 		}
 
 		// Top
@@ -301,7 +315,7 @@ __global__ void kernel2DXYnp
 
 		if (tileTop == 1)
 		{
-			if (threadIdx.x < BLOCK_X - numStenRight && threadIdx.y >= numStenTop)
+			if(globalIdx < nx && globalIdy < nyTile)
 			{
 				dataOutput[globalIdy * nx + globalIdx] = sum;
 			}
@@ -347,19 +361,21 @@ __global__ void kernel2DXYnp
 			arrayLocal[threadIdx.y * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy - numStenTop) * nx + (globalIdx + BLOCK_X)];
 		}
 
-		if (tileBottom != 1)
+		// Bottom Left
+		if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
 		{
-			// Bottom
-			if (threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = boundaryBottom[threadIdx.y * nx + globalIdx];
-			}
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx - numStenLeft)];
+		}
+		// Bottom
+		if (threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = dataInput[(globalIdy + BLOCK_Y) * nx + globalIdx];
+		}
 
-			// Bottom Right
-			if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] =  boundaryBottom[threadIdx.y * nx + (globalIdx + BLOCK_X)];
-			}
+		// Bottom Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx + BLOCK_X)];
 		}
 
 		// Ensure the copy is complete
@@ -393,7 +409,7 @@ __global__ void kernel2DXYnp
 
 		if (tileBottom == 1)
 		{
-			if (threadIdx.x >= numStenLeft && threadIdx.y < BLOCK_Y - numStenBottom)
+			if (globalIdx < nx && globalIdy < nyTile)
 			{
 				dataOutput[globalIdy * nx + globalIdx] = sum;
 			}
@@ -425,6 +441,11 @@ __global__ void kernel2DXYnp
 		{
 			arrayLocal[localIdy * nxLocal + threadIdx.x] = dataInput[globalIdy * nx + (globalIdx - numStenLeft)];
 		}
+		// Right
+		if (threadIdx.x < numStenRight)
+		{
+			arrayLocal[localIdy * nxLocal + (localIdx + BLOCK_X)] = dataInput[globalIdy * nx + globalIdx + BLOCK_X];
+		}
 
 		// Top
 		if (threadIdx.y < numStenTop)
@@ -437,20 +458,26 @@ __global__ void kernel2DXYnp
 		{
 			arrayLocal[threadIdx.y * nxLocal + threadIdx.x] = dataInput[(globalIdy - numStenTop) * nx + (globalIdx - numStenLeft)];
 		}
-
-		if (tileBottom != 1)
+		// Top Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenTop)
 		{
-			// Bottom
-			if (threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = boundaryBottom[threadIdx.y * nx + globalIdx];
-			}
+			arrayLocal[threadIdx.y * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy - numStenTop) * nx + (globalIdx + BLOCK_X)];
+		}
+		// Bottom Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx + BLOCK_X)];
+		}
 
-			// Bottom Left
-			if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = boundaryBottom[threadIdx.y * nx + (globalIdx - numStenLeft)];
-			}
+		// Bottom Left
+		if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx - numStenLeft)];
+		}
+		// Bottom
+		if (threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = dataInput[(globalIdy + BLOCK_Y) * nx + globalIdx];
 		}
 
 		// Ensure copying completed
@@ -484,7 +511,7 @@ __global__ void kernel2DXYnp
 
 		if (tileBottom == 1)
 		{
-			if (threadIdx.x < BLOCK_X - numStenRight && threadIdx.y < BLOCK_Y - numStenBottom)
+			if (globalIdx < nx && globalIdy < nyTile)
 			{
 				dataOutput[globalIdy * nx + globalIdx] = sum;
 			}
@@ -647,25 +674,22 @@ __global__ void kernel2DXYnp
 			arrayLocal[threadIdx.y * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy - numStenTop) * nx + (globalIdx + BLOCK_X)];
 		}
 
-		if (tileBottom != 1)
+		// Bottom
+		if (threadIdx.y < numStenBottom)
 		{
-			// Bottom
-			if (threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = boundaryBottom[threadIdx.y * nx + globalIdx];
-			}
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + localIdx] = dataInput[(globalIdy + BLOCK_Y) * nx + globalIdx];
+		}
 
-			// Bottom Left
-			if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = boundaryBottom[threadIdx.y * nx + (globalIdx - numStenLeft)];
-			}
+		// Bottom Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx + BLOCK_X)];
+		}
 
-			// Bottom Right
-			if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
-			{
-				arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] =  boundaryBottom[threadIdx.y * nx + (globalIdx + BLOCK_X)];
-			}
+		// Bottom Left
+		if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx - numStenLeft)];
 		}	
 
 		// Ensure copying completed
@@ -699,7 +723,7 @@ __global__ void kernel2DXYnp
 
 		if (tileBottom == 1)
 		{
-			if (threadIdx.y < BLOCK_Y - numStenBottom)
+			if (globalIdy < nyTile)
 			{
 				dataOutput[globalIdy * nx + globalIdx] = sum;
 			}
@@ -807,6 +831,12 @@ __global__ void kernel2DXYnp
 			arrayLocal[localIdy * nxLocal + threadIdx.x] = dataInput[globalIdy * nx + (globalIdx - numStenLeft)];
 		}
 
+		// Right
+		if (threadIdx.x < numStenRight)
+		{
+			arrayLocal[localIdy * nxLocal + (localIdx + BLOCK_X)] = dataInput[globalIdy * nx + globalIdx + BLOCK_X];
+		}
+
 		// Top
 		if (threadIdx.y < numStenTop )
 		{
@@ -829,6 +859,18 @@ __global__ void kernel2DXYnp
 		if (threadIdx.x < numStenLeft && threadIdx.y < numStenBottom)
 		{
 			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + threadIdx.x] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx - numStenLeft)];
+		}
+
+		// Bottom Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenBottom)
+		{
+			arrayLocal[(localIdy + BLOCK_Y) * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy + BLOCK_Y) * nx + (globalIdx + BLOCK_X)];
+		}
+
+		// Top Right
+		if (threadIdx.x < numStenRight && threadIdx.y < numStenTop)
+		{
+			arrayLocal[threadIdx.y * nxLocal + (localIdx + BLOCK_X)] = dataInput[(globalIdy - numStenTop) * nx + (globalIdx + BLOCK_X)];
 		}
 
 		// Ensure copying completed
@@ -860,7 +902,7 @@ __global__ void kernel2DXYnp
 		// Copy back 
 		// ----------
 
-		if (threadIdx.x < BLOCK_X - numStenLeft)
+		if (globalIdx < nx)
 		{
 			dataOutput[globalIdy * nx + globalIdx] = sum;
 		}
@@ -990,20 +1032,40 @@ void cuStenCompute2DXYnp
 
 	// Load the weights
 	cudaMemPrefetchAsync(pt_cuSten->weights, pt_cuSten->numSten * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
+	sprintf(msgStringBuffer, "Prefetching weights");
+ 	checkError(msgStringBuffer);
 
 	// Ensure the current stream is free
 	cudaStreamSynchronize(pt_cuSten->streams[1]);
+	sprintf(msgStringBuffer, "Synchronizing stream 1");
+ 	checkError(msgStringBuffer);
 
 	// Prefetch the tile data
 	cudaMemPrefetchAsync(pt_cuSten->dataInput[0], pt_cuSten->nx * pt_cuSten->nyTile * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
+	sprintf(msgStringBuffer, "Prefetching input");
+ 	checkError(msgStringBuffer);
+
 	cudaMemPrefetchAsync(pt_cuSten->dataOutput[0], pt_cuSten->nx * pt_cuSten->nyTile * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
+	sprintf(msgStringBuffer, "Prefetching output");
+ 	checkError(msgStringBuffer);
 
 	// Prefetch the boundary data
-	cudaMemPrefetchAsync(pt_cuSten->boundaryTop[0], pt_cuSten->numBoundaryTop * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
-	cudaMemPrefetchAsync(pt_cuSten->boundaryBottom[0], pt_cuSten->numBoundaryTop * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
+	if(pt_cuSten->numBoundaryBottom > 0) {
+		cudaMemPrefetchAsync(pt_cuSten->boundaryBottom[0], pt_cuSten->numBoundaryBottom * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
+		sprintf(msgStringBuffer, "Prefetching boundary bottom");
+		checkError(msgStringBuffer);
+	}
+	if(pt_cuSten->numBoundaryTop > 0) {
+		cudaMemPrefetchAsync(pt_cuSten->boundaryTop[0], pt_cuSten->numBoundaryTop * sizeof(elemType), pt_cuSten->deviceNum, pt_cuSten->streams[1]);
+		sprintf(msgStringBuffer, "Prefetching boundary top");
+		checkError(msgStringBuffer);
+	}
+	
 
 	// Record the event
 	cudaEventRecord(pt_cuSten->events[0], pt_cuSten->streams[1]);
+	sprintf(msgStringBuffer, "Recording event");
+ 	checkError(msgStringBuffer);
 
 	// Temporary stream and event used for permuting
 	cudaStream_t ts;
@@ -1042,7 +1104,8 @@ void cuStenCompute2DXYnp
 		}
 		// Synchronise the events to ensure computation overlaps
 		cudaEventSynchronize(pt_cuSten->events[0]);
-
+		sprintf(msgStringBuffer, "Synchronizing event");
+		checkError(msgStringBuffer);
 		// Preform the computation on the current tile
 		kernel2DXYnp<<<gridDim, blockDim, pt_cuSten->mem_shared, pt_cuSten->streams[0]>>>(
 			pt_cuSten->dataOutput[tile], 

@@ -95,14 +95,8 @@ __global__ void kernel2DXYnp
 	extern __shared__ int memory[];
 
 	elemType* arrayLocal = (elemType*)&memory;
-	elemType* weigthsLocal = (elemType*)&arrayLocal[nxLocal * nyLocal];
 
-	// Move the weigths into shared memory
-	#pragma unroll
-	for (int k = 0; k < numSten; k++)
-	{
-		weigthsLocal[k] = weights[k];
-	}
+	const float numStenFloat = static_cast<float>(numSten);
 
 	// -----------------------------
 	// Set the indexing
@@ -124,9 +118,6 @@ __global__ void kernel2DXYnp
 
 	// Set temporary index for looping
 	int temp;
-
-	// Use to loop over indexing in the weighsLocal
-	int weight = 0;
 
 	// -----------------------------
 	// We divide the domain in 9 - 4x Corners, 4x Edges, 1x Interior
@@ -187,7 +178,6 @@ __global__ void kernel2DXYnp
 		// ----------
 
 		stenSet = threadIdx.y * nxLocal + threadIdx.x;
-		weight = 0;
 
 		for (int j = 0; j < numStenVert; j++) // Allow for the point we're actually at
 		{
@@ -195,11 +185,11 @@ __global__ void kernel2DXYnp
 
 			for (int i = 0; i < numStenHoriz; i++) // Allow for the point we're actually at
 			{
-				sum += weigthsLocal[weight] * arrayLocal[stenSet + temp + i];
-
-				weight++;
+				sum += arrayLocal[stenSet + temp + i];
 			} 
 		}
+
+		sum /= numStenFloat;
 
 		// Ensure the compute is complete
 		__syncthreads();
@@ -292,7 +282,6 @@ __global__ void kernel2DXYnp
 		// ----------
 
 		stenSet = threadIdx.y * nxLocal + threadIdx.x;
-		weight = 0;
 
 		for (int j = 0; j < numStenVert; j++) // Allow for the point we're actually at
 		{
@@ -300,11 +289,11 @@ __global__ void kernel2DXYnp
 
 			for (int i = 0; i < numStenHoriz; i++) // Allow for the point we're actually at
 			{
-				sum += weigthsLocal[weight] * arrayLocal[stenSet + temp + i];
-
-				weight++;
+				sum += arrayLocal[stenSet + temp + i];
 			} 
 		}
+
+		sum /= numStenFloat;
 
 		// Ensure the compute is complete
 		__syncthreads();
@@ -386,7 +375,6 @@ __global__ void kernel2DXYnp
 		// ----------
 
 		stenSet = threadIdx.y * nxLocal + threadIdx.x;
-		weight = 0;
 
 		for (int j = 0; j < numStenVert; j++) // Allow for the point we're actually at
 		{
@@ -394,11 +382,11 @@ __global__ void kernel2DXYnp
 
 			for (int i = 0; i < numStenHoriz; i++) // Allow for the point we're actually at
 			{
-				sum += weigthsLocal[weight] * arrayLocal[stenSet + temp + i];
-
-				weight++;
+				sum += arrayLocal[stenSet + temp + i];
 			} 
 		}
+
+		sum /= numStenFloat;
 
 		// Ensure the compute is complete
 		__syncthreads();
@@ -488,7 +476,6 @@ __global__ void kernel2DXYnp
 		// ----------
 
 		stenSet = threadIdx.y * nxLocal + threadIdx.x;
-		weight = 0;
 
 		for (int j = 0; j < numStenVert; j++) // Allow for the point we're actually at
 		{
@@ -496,11 +483,11 @@ __global__ void kernel2DXYnp
 
 			for (int i = 0; i < numStenHoriz; i++) // Allow for the point we're actually at
 			{
-				sum += weigthsLocal[weight] * arrayLocal[stenSet + temp + i];
-
-				weight++;
+				sum += arrayLocal[stenSet + temp + i];
 			} 
 		}
+
+		sum /= numStenFloat;
 
 		// Ensure the compute is complete
 		__syncthreads();
@@ -597,7 +584,6 @@ __global__ void kernel2DXYnp
 		// ----------
 
 		stenSet = threadIdx.y * nxLocal + threadIdx.x;
-		weight = 0;
 
 		for (int j = 0; j < numStenVert; j++) // Allow for the point we're actually at
 		{
@@ -605,11 +591,11 @@ __global__ void kernel2DXYnp
 
 			for (int i = 0; i < numStenHoriz; i++) // Allow for the point we're actually at
 			{
-				sum += weigthsLocal[weight] * arrayLocal[stenSet + temp + i];
-
-				weight++;
+				sum += arrayLocal[stenSet + temp + i];
 			} 
 		}
+
+		sum /= numStenFloat;
 
 		// Ensure the compute is complete
 		__syncthreads();
@@ -700,7 +686,6 @@ __global__ void kernel2DXYnp
 		// ----------
 
 		stenSet = threadIdx.y * nxLocal + threadIdx.x;
-		weight = 0;
 
 		for (int j = 0; j < numStenVert; j++) // Allow for the point we're actually at
 		{
@@ -708,11 +693,11 @@ __global__ void kernel2DXYnp
 
 			for (int i = 0; i < numStenHoriz; i++) // Allow for the point we're actually at
 			{
-				sum += weigthsLocal[weight] * arrayLocal[stenSet + temp + i];
-
-				weight++;
+				sum += arrayLocal[stenSet + temp + i];
 			} 
 		}
+
+		sum /= numStenFloat;
 
 		// Ensure the compute is complete
 		__syncthreads();
@@ -785,7 +770,6 @@ __global__ void kernel2DXYnp
 		// ----------
 
 		stenSet = threadIdx.y * nxLocal + threadIdx.x;
-		weight = 0;
 
 		for (int j = 0; j < numStenVert; j++) // Allow for the point we're actually at
 		{
@@ -793,11 +777,11 @@ __global__ void kernel2DXYnp
 
 			for (int i = 0; i < numStenHoriz; i++) // Allow for the point we're actually at
 			{
-				sum += weigthsLocal[weight] * arrayLocal[stenSet + temp + i];
-
-				weight++;
+				sum += arrayLocal[stenSet + temp + i];
 			} 
 		}
+
+		sum /= numStenFloat;
 
 		// Ensure the compute is complete
 		__syncthreads();
@@ -881,7 +865,6 @@ __global__ void kernel2DXYnp
 		// ----------
 
 		stenSet = threadIdx.y * nxLocal + threadIdx.x;
-		weight = 0;
 
 		for (int j = 0; j < numStenVert; j++) // Allow for the point we're actually at
 		{
@@ -889,11 +872,11 @@ __global__ void kernel2DXYnp
 
 			for (int i = 0; i < numStenHoriz; i++) // Allow for the point we're actually at
 			{
-				sum += weigthsLocal[weight] * arrayLocal[stenSet + temp + i];
-
-				weight++;
+				sum += arrayLocal[stenSet + temp + i];
 			} 
 		}
+
+		sum /= numStenFloat;
 
 		// Ensure the compute is complete
 		__syncthreads();
@@ -977,7 +960,6 @@ __global__ void kernel2DXYnp
 		// ----------
 
 		stenSet = threadIdx.y * nxLocal + threadIdx.x;
-		weight = 0;
 
 		for (int j = 0; j < numStenVert; j++) // Allow for the point we're actually at
 		{
@@ -985,11 +967,11 @@ __global__ void kernel2DXYnp
 
 			for (int i = 0; i < numStenHoriz; i++) // Allow for the point we're actually at
 			{
-				sum += weigthsLocal[weight] * arrayLocal[stenSet + temp + i];
-
-				weight++;
+				sum += arrayLocal[stenSet + temp + i];
 			} 
 		}
+
+		sum /= numStenFloat;
 
 		// Ensure the compute is complete
 		__syncthreads();
